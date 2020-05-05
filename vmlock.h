@@ -5,5 +5,5 @@
 #define VMLOCK_H
 
 struct vmLock; //Defined in vmlock.c
-struct vmLock SpinLockBuilder(void);
+struct vmLock spinlockBuilder(void);
 #endif

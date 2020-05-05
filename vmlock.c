@@ -69,7 +69,7 @@ int isLocked(struct vmLock* vml)
 
 //Creates a very simplified spinlock oriented vmLock struct
 //which uses the same lock for read and write purposes.
-struct vmLock SpinLockBuilder(void) 
+struct vmLock spinlockBuilder(void) 
 {
 
 	struct vmLock vml;
