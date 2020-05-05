@@ -1,6 +1,7 @@
 //VirtualMouse - A driver to emulate a BUS protocol mouse for the linux kernel.
 //Author: Edwin Heerschap
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/types.h>
@@ -8,6 +9,7 @@
 #include <linux/mutex.h>
 #include <linux/init.h>
 #include "vmlock.h"
+#include <linux/slab.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Edwin Heerschap");
@@ -20,15 +22,20 @@ MODULE_AUTHOR("Edwin Heerschap");
 	#define VM_MAJOR 0 //0 = Dynamic assignment of major number
 #endif
 
-typedef uint8_t minor_t;
+#define VM_MINOR_TYPE ushort //Required because preprocessor is unaware of
+//typedef declarations and minor_t (below) type is required in 
+//module_param macro.
+
+typedef VM_MINOR_TYPE minor_t;
+#define WORLD_READABLE 0444
 
 static minor_t argMinorCount = 1;
 
-MODULE_PARAM(argMinorCount, "i");
-MODULE_PARAM_DESC(argMinorCount, "Number of virtual mice to create.");
+module_param(argMinorCount, VM_MINOR_TYPE, WORLD_READABLE);
+MODULE_PARM_DESC(argMinorCount, "Number of virtual mice to create.");
 
 //Defines the instruction types that can be executed.
-static enum vmInstructionType {
+enum vmInstructionType {
 	
 	leftDown = 0,
 	leftUp = 1,
@@ -43,11 +50,11 @@ static enum vmInstructionType {
 
 //Defined to wrap vmInstructionType for now because may need to include
 //extra information about instruction in the future.
-static struct vmInstruction {
+struct vmInstruction {
 	enum vmInstructionType type;
 };
 
-static struct vmDevice {
+struct vmDevice {
 	minor_t minor;
 	struct vmInstruction intstruction[INSTRUC_BUF_LEN];
 	struct vmLock lock;
@@ -82,7 +89,7 @@ static int vmOpen (struct inode * in, struct file * filp)
 
 }
 
-static vmRelease (struct inode * in, struct file * filp)
+static int vmRelease (struct inode * in, struct file * filp)
 {
 
 }
@@ -103,45 +110,43 @@ unsigned int vmMajor;
 
 static int __init virtualMouseInit(void)
 {
-	
-	printk(KERN_ALERT "Virtual Mouse Driver Starting");
 
-	//Check linux/fs/char_dev.c, helpful information in there.
-	//
-	//Registering directly because we don't want to preallocate a dev_t.
-	struct char_device_struct *cd;
-	cd = __register_chrdev_region(VM_MAJOR, BASEMINOR, 
-			VM_MINOR_COUNT, DRIVER_NAME);
+	minor_t devNum = BASE_MINOR;
+	dev_t firstDev = MKDEV(0, BASE_MINOR);
+	struct vmDevice device;
+
+	printk(KERN_ALERT "Virtual Mouse Driver Starting");	
+
+	if (alloc_chrdev_region(&firstDev, BASE_MINOR, argMinorCount,
+			       	DRIVER_NAME)) {
 	
-	if (IS_ERR(cd)) {
-		printk(KERN_ALERT "Failed to start Virtual Mouse Driver");
-		return PTR_ERR(cd);
+		printk(KERN_ALERT "Virtual Mouse Failed to allocate \
+					character device region");
+		return 1;
 	}
 
-	vmMajor = cd->major;
-	
+	vmMajor = MAJOR(firstDev);
+
 	//Number of devices is passed as parameter so device array size
 	//is dynamically assigned.
-	vmDevices = (vmDevice *) kmalloc(argMinorCount * sizeof(vmDevice),
-			GFP_KERNEL);
+	vmDevices = (struct vmDevice *) kmalloc(argMinorCount * \
+		       	sizeof(struct vmDevice), GFP_KERNEL);
+	
+	
+	for(; devNum < argMinorCount + BASE_MINOR; devNum++) {
+		
+		dev_t devicePair = MKDEV(vmMajor, devNum);
+		
+		device.minor = devNum;
+		device.lock = spinlockBuilder();
 
-	for(minor_t devNum = BASE_MINOR; 
-			devNum < argMinorCount + BASEMINOR; i++) {
-		
-		dev_t *devicePair = MKDEV(cd->vmMajor, devNum);
-		
-		struct vmDevice device {
-			.minor = devNum,
-			.instruction = [],
-			.lock = spinlockBuilder()
-		};
 		
 		cdev_init(&device.dev, &fops);
 		device.dev.owner = THIS_MODULE;
 
 		//Last parameter is 1 as we only want 1 minor number
 		//corresponding to each virtual device.
-		cdev_add(device.dev, devicePair, 1);
+		cdev_add(&device.dev, devicePair, 1);
 		
 		vmDevices[devNum] = device;
 	}
@@ -155,9 +160,11 @@ static void __exit virtualMouseExit(void)
 
 	if (vmDevices) {
 		
-		for(int deviceNo = 0; deviceNo < argMinorCount; deviceNo++) {
-			
-			cdev_del(&vmDevices[deviceNo].cdev);
+		unsigned short deviceNo;
+		for(deviceNo = 0; deviceNo < argMinorCount; deviceNo++) {
+					
+			cdev_del(&vmDevices[deviceNo].dev);
+			vmDevices[deviceNo].lock.cleanup(&vmDevices[deviceNo].lock);
 			
 		}
 		

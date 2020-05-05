@@ -11,22 +11,7 @@
 #include <linux/spinlock.h>
 #include <asm/spinlock.h>
 #include <linux/slab.h>
-
-struct vmLock {
-
-	int (*canRead) (struct vmLock *);
-	int (*canWrite) (struct vmLock *);
-	int (*isLocked) (struct vmLock *);
-	void(*readLock) (struct vmLock *);
-	void (*writeLock) (struct vmLock *);
-	void (*rwLock) (struct vmLock *);
-	void (*readUnlock) (struct vmLock *);
-	void (*writeUnlock) (struct vmLock *);
-	void (*rwUnlock) (struct vmLock *);
-	void (*cleanup) (struct vmLock *);
-	void *lock;
-
-};
+#include "vmlock.h"
 
 
 //////////////////////////////////////////////
@@ -71,7 +56,7 @@ int isLocked(struct vmLock* vml)
 //which uses the same lock for read and write purposes.
 struct vmLock spinlockBuilder(void) 
 {
-
+	DEFINE_SPINLOCK(spinlock);
 	struct vmLock vml;
 	vml.canRead = vmSpinlockCan;
 	vml.canWrite = vmSpinlockCan;
@@ -83,8 +68,8 @@ struct vmLock spinlockBuilder(void)
 	vml.writeUnlock = vmSpinlockUnlock;
 	vml.rwUnlock = vmSpinlockUnlock;
 	kmalloc(sizeof(spinlock_t), GFP_KERNEL);
-	DEFINE_SPINLOCK(spinlock);
-	*((spinlock_t *) vml.lock) = spinlock;
+	
+	vml.lock = &spinlock;
 	return vml;
 
 };
