@@ -55,12 +55,14 @@ static struct vmDevice {
 
 static struct vmDevice* vmDevices;
 
-static ssize_t vmRead(struct file* filp, char __user* buf, size_t count, loff_t* offset)
+static ssize_t vmRead(struct file* filp, char __user* buf, size_t count,
+	       	loff_t* offset)
 {
 	
 }
 
-static ssize_t vmWrite(struct file* filp, const char __user* buf, size_t count, loff_t* offset)
+static ssize_t vmWrite(struct file* filp, const char __user* buf, size_t count, 
+		loff_t* offset)
 {
 
 
