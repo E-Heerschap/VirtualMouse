@@ -18,6 +18,8 @@ MODULE_AUTHOR("Edwin Heerschap");
 #define BASE_MINOR 0
 #define DRIVER_NAME "Virtual Mouse"
 
+#define VM_DEBUG
+
 #ifndef VM_MAJOR
 	#define VM_MAJOR 0 //0 = Dynamic assignment of major number
 #endif
@@ -59,6 +61,7 @@ struct vmDevice {
 	struct vmInstruction intstruction[INSTRUC_BUF_LEN];
 	struct vmLock lock;
 	struct cdev dev;
+	dev_t devno;
 };
 
 static struct vmDevice* vmDevices;
@@ -94,15 +97,7 @@ static int vmRelease (struct inode * in, struct file * filp)
 
 }
 
-struct file_operations fops = {
-	
-	.open = vmOpen,
-	.release = vmRelease,
-	.write = vmWrite,
-	.read = vmRead,
-	.poll = vmPoll
-
-};
+struct file_operations fops = {};
 
 //Used instead of VM_MAJOR definition because if VM_MAJOR = 0 dynamic
 //assignment occurs.
@@ -112,44 +107,53 @@ static int __init virtualMouseInit(void)
 {
 
 	minor_t devNum = BASE_MINOR;
-	dev_t firstDev = MKDEV(0, BASE_MINOR);
-	struct vmDevice device;
+	dev_t firstDev = 0;
 
-	printk(KERN_ALERT "Virtual Mouse Driver Starting");	
-
+	printk(KERN_NOTICE "Virtual Mouse Driver Starting\n");	
+		
 	if (alloc_chrdev_region(&firstDev, BASE_MINOR, argMinorCount,
 			       	DRIVER_NAME)) {
 	
 		printk(KERN_ALERT "Virtual Mouse Failed to allocate \
-					character device region");
+					character device region\n");
 		return 1;
 	}
 
 	vmMajor = MAJOR(firstDev);
 
+	#ifdef VM_DEBUG
+		printk(KERN_ALERT "VM DEBUG: Major # given: %u\n", vmMajor);
+		printk(KERN_ALERT "VM DEBUG: Minor count: %u\n", argMinorCount);
+	#endif
+
 	//Number of devices is passed as parameter so device array size
 	//is dynamically assigned.
 	vmDevices = (struct vmDevice *) kmalloc(argMinorCount * \
 		       	sizeof(struct vmDevice), GFP_KERNEL);
-	
+
+	memset(vmDevices, 0, sizeof(struct vmDevice) * argMinorCount);
 	
 	for(; devNum < argMinorCount + BASE_MINOR; devNum++) {
 		
-		dev_t devicePair = MKDEV(vmMajor, devNum);
-		
-		device.minor = devNum;
-		device.lock = spinlockBuilder();
+		vmDevices[devNum].devno = MKDEV(vmMajor, devNum);
+		vmDevices[devNum].minor = devNum;
+		vmDevices[devNum].lock = spinlockBuilder();
 
-		
-		cdev_init(&device.dev, &fops);
-		device.dev.owner = THIS_MODULE;
-
+		cdev_init(&vmDevices[devNum].dev, &fops);
+		vmDevices[devNum].dev.owner = THIS_MODULE;
+		vmDevices[devNum].dev.ops = &fops;
 		//Last parameter is 1 as we only want 1 minor number
 		//corresponding to each virtual device.
-		cdev_add(&device.dev, devicePair, 1);
+		if(cdev_add(&vmDevices[devNum].dev, vmDevices[devNum].devno, 1)) {
+			printk(KERN_ALERT "VirtualMouse failed to \
+					add character device to region. \
+					Major: %u, Minor: %u\n", vmMajor,
+				       	MINOR(vmDevices[devNum].devno));
+		}
 		
-		vmDevices[devNum] = device;
 	}
+	
+	printk(KERN_NOTICE "VirtualMouse started successfully\n");
 
 	return 0;
 
@@ -157,14 +161,24 @@ static int __init virtualMouseInit(void)
 
 static void __exit virtualMouseExit(void)
 {
-
+	unsigned short deviceNo;
+	printk(KERN_CRIT "Stopping virtual mouse.\n");
+	
 	if (vmDevices) {
+	
+		#ifdef VM_DEBUG
+		printk(KERN_ALERT "VM DEBUG: vmDevices not NULL\n");
+		#endif	
 		
-		unsigned short deviceNo;
-		for(deviceNo = 0; deviceNo < argMinorCount; deviceNo++) {
-					
+	
+		for(deviceNo = BASE_MINOR; deviceNo < argMinorCount + BASE_MINOR; deviceNo++) {
+			
+			#ifdef VM_DEBUG
+			printk(KERN_ALERT "VM DEBUG: Removing device %u %u\n", \
+				vmMajor, deviceNo);
+			#endif
 			cdev_del(&vmDevices[deviceNo].dev);
-			vmDevices[deviceNo].lock.cleanup(&vmDevices[deviceNo].lock);
+			//vmDevices[deviceNo].lock.cleanup(&vmDevices[deviceNo].lock);
 			
 		}
 		
@@ -172,7 +186,7 @@ static void __exit virtualMouseExit(void)
 	}
 	
 	unregister_chrdev_region(MKDEV(vmMajor, BASE_MINOR), argMinorCount);
-
+	
 }
 
 module_init(virtualMouseInit);
