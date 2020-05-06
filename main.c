@@ -17,7 +17,6 @@ MODULE_AUTHOR("Edwin Heerschap");
 #define INSTRUC_BUF_LEN 10
 #define BASE_MINOR 0
 #define DRIVER_NAME "Virtual Mouse"
-
 #define VM_DEBUG
 
 #ifndef VM_MAJOR
@@ -141,7 +140,6 @@ static int __init virtualMouseInit(void)
 		device->devno = MKDEV(vmMajor, devNum);
 		device->minor = devNum;
 		device->lock = spinlockBuilder();
-
 		cdev_init(&device->dev, &fops);
 		device->dev.owner = THIS_MODULE;
 		device->dev.ops = &fops;
@@ -181,7 +179,7 @@ static void __exit virtualMouseExit(void)
 				vmMajor, deviceNo);
 			#endif
 			cdev_del(&vmDevices[deviceNo].dev);
-			//vmDevices[deviceNo].lock.cleanup(&vmDevices[deviceNo].lock);
+			vmDevices[deviceNo].lock.cleanup(&vmDevices[deviceNo].lock);
 			
 		}
 		

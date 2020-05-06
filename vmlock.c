@@ -19,36 +19,36 @@
 // of the vmLock struct.
 /////////////////////////////////////////////
 
-void vmSpinlockLock(struct vmLock* vml)
+static void vmSpinlockLock(struct vmLock* vml)
 {
 
-	return spin_lock_irq((spinlock_t*) vml->lock);
+	return spin_lock_irq((spinlock_t*) vml->__lock);
 
 }
 
-void vmSpinlockUnlock(struct vmLock* vml)
+static void vmSpinlockUnlock(struct vmLock* vml)
 {
-	spin_unlock_irq((spinlock_t *)vml->lock);
+	spin_unlock_irq((spinlock_t *)vml->__lock);
 }
 
-int vmSpinlockCan(struct vmLock* vml) 
+static int vmSpinlockCan(struct vmLock* vml) 
 {
 	
-	int i = spin_is_locked((spinlock_t*) vml->lock);
+	int i = spin_is_locked((spinlock_t*) vml->__lock);
 	return i;
 	
 }
 
-void vmSpinlockClean(struct vmLock* vml)
+static void vmSpinlockClean(struct vmLock* vml)
 {
 	
-	kfree(vml->lock);
+	kfree(vml->__lock);
 
 }
 
-int isLocked(struct vmLock* vml)
+static int isLocked(struct vmLock* vml)
 {
-	int i = spin_is_locked((spinlock_t *) vml->lock);
+	int i = spin_is_locked((spinlock_t *) vml->__lock);
 	return i;
 }
 
@@ -58,6 +58,7 @@ struct vmLock spinlockBuilder(void)
 {
 	DEFINE_SPINLOCK(spinlock);
 	struct vmLock vml;
+
 	vml.canRead = vmSpinlockCan;
 	vml.canWrite = vmSpinlockCan;
 	vml.isLocked = isLocked;
@@ -67,9 +68,12 @@ struct vmLock spinlockBuilder(void)
 	vml.readUnlock = vmSpinlockUnlock;
 	vml.writeUnlock = vmSpinlockUnlock;
 	vml.rwUnlock = vmSpinlockUnlock;
-	kmalloc(sizeof(spinlock_t), GFP_KERNEL);
-	
-	vml.lock = &spinlock;
+	vml.cleanup = vmSpinlockClean;
+
+	//Setting spinlock
+	vml.__lock = (void *) kmalloc(sizeof(spinlock_t), GFP_KERNEL);
+	memset(vml.__lock, 0, sizeof(spinlock_t));
+	*((spinlock_t*) vml.__lock) = spinlock;
 	return vml;
 
 };

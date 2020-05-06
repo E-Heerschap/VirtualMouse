@@ -17,7 +17,7 @@ struct vmLock {
 	void (*writeUnlock) (struct vmLock *);
 	void (*rwUnlock) (struct vmLock *);
 	void (*cleanup) (struct vmLock *);
-	void *lock;
+	void *__lock;
 
 };
 struct vmLock spinlockBuilder(void);
