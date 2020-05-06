@@ -75,7 +75,7 @@ static ssize_t vmWrite(struct file* filp, const char __user* buf, size_t count,
 		loff_t* offset)
 {
 
-
+	
 
 }
 
