@@ -10,8 +10,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \usepackage{hyperref}
 \usepackage{graphicx}
+\usepackage{tikz}
 \usepackage[english]{babel}
+\usepackage{tikz-uml}
 
+\usetikzlibrary{positioning}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -48,11 +51,91 @@ VirtualMouse is a linux kernel driver aimed at providing programatic mouse funct
 \chapter*{Software Design}
 \addcontentsline{toc}{chapter}{Software Design}
 
-\section*{Seperation of concerns}
-\addcontentsline{toc}{section}{Seperation of concerns}
+\section*{Abstraction}
+\addcontentsline{toc}{section}{Abstraction}
 
-A seperation of concerns approach is taken for the design of VirtualMouse. 
+A seperation of concerns approach is taken for the design of VirtualMouse. This materializes in a layering pattern for the system. Four primary layers are present in the highest abstraction of the system; kernel driver, interface library, userspace implementation, other library. Interactions among them are represented in figure~\ref{fig:interactions}.\\
+
+\subsection*{Kernel Driver}
+VirtualMouse kernel driver is the core of the virtual mouse system. It is a character device driver for the linux kernel. Systems interpreting mouse protocols such as X11 or other kernel drivers will read input from here. The interface library requests actions from the kernel driver resulting in mouse events.
+
+\subsection*{Interface Library}
+The interface library is a native shared object file with methods to interact with the kernel driver. Maintaining an interface library removes userspace dependence on the kernel driver implementation. Secondly, it allows langauge independent access to kernel driver functionality.
+
+\subsection*{Userspace Implementation}
+Userspace implementation is userspace software employing the interface library to create mouse events.
+
+\subsection*{Other Library}
+Positional information of virtual mice is not stored in the kernel driver. It is the responsibility of software such as X11 to maintain positional information. Other unknown information as of current may also be unavailable to the kernel driver. Other libraries will get this information.
+
+\tikzstyle{abstraction} = [thick,draw=black,rectangle,minimum size=1cm]
+\begin{figure}[h]
+	\caption{Interaction between abstractions}
+	\label{fig:interactions}
+\begin{center}
+	\begin{tikzpicture}
+			\node at (0,0) [abstraction] (kerneldriver) {Kernel Driver};
+			\node [abstraction] (interfacelib) [right = of kerneldriver] {Interface Library}
+			edge [<->,thick] (kerneldriver);
+			\node [abstraction] (other) [below = of interfacelib] {Other Library}
+			edge [<->,thick] (interfacelib);
+			\node [abstraction] (userspaceimpl) [right = of interfacelib] {Userspace Impl.} edge [<->,thick] (interfacelib);
+			
+	\end{tikzpicture}
+\end{center}
+\end{figure}
+
+\section*{Kernel Driver}
+\addcontentsline{toc}{section}{Kernel Driver Design}
+\subsection*{Specifications}
+\addcontentsline{toc}{subsection}{Specifications}
 
 
+The kernel driver is required to support mulitple virtual mice. They may also be running concurrently. Each mice may have their own:
+\begin{itemize}
+	\item Protocol
+	\item Name
+	\item Access control (Locking)
+	\item Input/Output Control (IOCTL) access
+\end{itemize}
+Furthermore it is required that mice can be added and removed during runtime. They may also be specificed as input parameters. To be more verbose, the kernel driver must be capable of:
+\begin{itemize}
+	\item Mice
+	\begin{itemize}
+		\item Select the protocol
+		\item Select the name
+		\item Select type of access control
+		\item Perform mice actions
+	\end{itemize}
+	\item Add new mice during runtime
+	\item Remove mice during runtime
+	\item Add mice as startup parameters
+\end{itemize}
+
+\noindent
+Protocol and syntax on how to achieve each of these will be specified further into the initial development.
+
+\newpage
+
+\subsection*{Design}
+\addcontentsline{toc}{subsection}{Design}
+
+The design of the kernel driver will attempt to comply with the S.O.L.I.D design principles\footnote{https://scotch.io/bar-talk/s-o-l-i-d-the-first-five-principles-of-object-oriented-design} as closely as realistically possible (as $C$ doesn't have classes).\\
+
+\noindent
+The following \textit{struct vmDevice} represents a C structure which represents a virtual mouse. The \textit{cdev, dev, lock} fields are not pointers as they are individual to the device and hence should only be stored against the single device. However, multiple mouses can use the same protocol or IOCTL mechanics.
+\begin{center}
+	\begin{tikzpicture}
+	
+		\umlclass{struct vmDevice}{
+		+ char* name \\
+		+ struct vmProtocol*	protocol \\
+		+ struct vmLock lock \\
+		+ struct cdev cdev \\
+		+ struct vmIOCTL* ioctl\\
+		+ dev\_t dev }
+	
+	\end{tikzpicture}
+\end{center}
 
 \end{document}
