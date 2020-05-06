@@ -108,6 +108,8 @@ static int __init virtualMouseInit(void)
 
 	minor_t devNum = BASE_MINOR;
 	dev_t firstDev = 0;
+	
+	struct vmDevice* device;
 
 	printk(KERN_NOTICE "Virtual Mouse Driver Starting\n");	
 		
@@ -135,20 +137,21 @@ static int __init virtualMouseInit(void)
 	
 	for(; devNum < argMinorCount + BASE_MINOR; devNum++) {
 		
-		vmDevices[devNum].devno = MKDEV(vmMajor, devNum);
-		vmDevices[devNum].minor = devNum;
-		vmDevices[devNum].lock = spinlockBuilder();
+		device = &vmDevices[devNum];
+		device->devno = MKDEV(vmMajor, devNum);
+		device->minor = devNum;
+		device->lock = spinlockBuilder();
 
-		cdev_init(&vmDevices[devNum].dev, &fops);
-		vmDevices[devNum].dev.owner = THIS_MODULE;
-		vmDevices[devNum].dev.ops = &fops;
+		cdev_init(&device->dev, &fops);
+		device->dev.owner = THIS_MODULE;
+		device->dev.ops = &fops;
 		//Last parameter is 1 as we only want 1 minor number
 		//corresponding to each virtual device.
-		if(cdev_add(&vmDevices[devNum].dev, vmDevices[devNum].devno, 1)) {
+		if(cdev_add(&device->dev, device->devno, 1)) {
 			printk(KERN_ALERT "VirtualMouse failed to \
 					add character device to region. \
 					Major: %u, Minor: %u\n", vmMajor,
-				       	MINOR(vmDevices[devNum].devno));
+				       	MINOR(device->devno));
 		}
 		
 	}
