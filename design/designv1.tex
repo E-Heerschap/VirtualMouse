@@ -123,19 +123,33 @@ Protocol and syntax on how to achieve each of these will be specified further in
 The design of the kernel driver will attempt to comply with the S.O.L.I.D design principles\footnote{https://scotch.io/bar-talk/s-o-l-i-d-the-first-five-principles-of-object-oriented-design} as closely as realistically possible (as $C$ doesn't have classes).\\
 
 \noindent
-The following \textit{struct vmDevice} represents a C structure which represents a virtual mouse. The \textit{cdev, dev, lock} fields are not pointers as they are individual to the device and hence should only be stored against the single device. However, multiple mouses can use the same protocol or IOCTL mechanics.
-\begin{center}
-	\begin{tikzpicture}
-	
-		\umlclass{struct vmDevice}{
-		+ char* name \\
-		+ struct vmProtocol*	protocol \\
-		+ struct vmLock lock \\
-		+ struct cdev cdev \\
-		+ struct vmIOCTL* ioctl\\
-		+ dev\_t dev }
-	
-	\end{tikzpicture}
-\end{center}
+Figure \ref{fig:vmDevice} represents the \textit{vmDevice} structure which represents a virtual mouse. The \textit{cdev, dev, lock} fields are not pointers as they are individual to the device and hence should only be stored against the single device. However, multiple mouses can use the same protocol or IOCTL mechanics. 
+\begin{figure}
+	\caption{vmDevice structure \& dependencies}
+	\label{fig:vmDevice}
+	\begin{center}
+		\begin{tikzpicture}
+		
+			\umlclass[x=-6]{struct vmDevice}{
+			+ char* name \\
+			+ vmProtocol*	protocol \\
+			+ vmLock lock \\
+			+ cdev cdev \\
+			+ dev\_t dev\\
+		...}{ioctl()};
+			
+			
+			\umlclass[x=-1]{vmProtocol}{
+			+ char* name\\
+			+ file\_operations fops\\
+			...
+		}{};
+			
+			\umlclass[x=3.5]{file\_operations}{}{(...fops methods)};
+			
+			\umlclass[y=-3]{vmIOCTL}{};
+		\end{tikzpicture}
+	\end{center}
+\end{figure}
 
 \end{document}
