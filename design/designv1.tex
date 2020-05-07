@@ -13,6 +13,7 @@
 \usepackage{tikz}
 \usepackage[english]{babel}
 \usepackage{tikz-uml}
+\usepackage{hyperref}
 
 \usetikzlibrary{positioning}
 
@@ -43,12 +44,12 @@
 % Preface %
 %%%%%%%%%%%
 \chapter*{Preface}
-VirtualMouse is a linux kernel driver aimed at providing programatic mouse functionality. It is encompassed by the VirtualHideout project by SneakyHideout; which aims to create virtual peripherals. This document desribes the key performance indicators (KPIs), software design and protocol specifications for VirtualMouse v1.0. This document is not developer documentation for parts of the project.
+VirtualMouse is a linux kernel driver aimed at providing programmatic mouse functionality. It is encompassed by the VirtualHideout project by SneakyHideout; which aims to create virtual peripherals. This document describes the software design and specifications for VirtualMouse v1.0. This document is not developer documentation for parts of the project.
 
 %%%%%%%%%%%%%%%%
 % NEW CHAPTER! %
 %%%%%%%%%%%%%%%%
-\chapter*{Software Design}
+\chapter*{Software Design Overview}
 \addcontentsline{toc}{chapter}{Software Design}
 
 \section*{Abstraction}
@@ -60,7 +61,7 @@ A seperation of concerns approach is taken for the design of VirtualMouse. This 
 VirtualMouse kernel driver is the core of the virtual mouse system. It is a character device driver for the linux kernel. Systems interpreting mouse protocols such as X11 or other kernel drivers will read input from here. The interface library requests actions from the kernel driver resulting in mouse events.
 
 \subsection*{Interface Library}
-The interface library is a native shared object file with methods to interact with the kernel driver. Maintaining an interface library removes userspace dependence on the kernel driver implementation. Secondly, it allows langauge independent access to kernel driver functionality.
+The interface library is a native shared object file with methods to interact with the kernel driver. Maintaining an interface library removes userspace dependence on the kernel driver implementation. Secondly, it allows language independent access to kernel driver functionality.
 
 \subsection*{Userspace Implementation}
 Userspace implementation is userspace software employing the interface library to create mouse events.
@@ -87,11 +88,17 @@ Positional information of virtual mice is not stored in the kernel driver. It is
 
 \section*{Kernel Driver}
 \addcontentsline{toc}{section}{Kernel Driver Design}
+
+The design of the kernel driver will attempt to comply with the S.O.L.I.D design principles\footnote{https://scotch.io/bar-talk/s-o-l-i-d-the-first-five-principles-of-object-oriented-design} as closely as realistically possible (as $C$ is not directly object oriented).\\
+
+\noindent
+In this description the semantics for a structure having a method is a function exists which accepts the structure as one of its parameters. For example, \textit{vmDevice}'s ioctl() method accepts a (\textit{struct vmDevice*}) as one of its parameters. 
+
 \subsection*{Specifications}
 \addcontentsline{toc}{subsection}{Specifications}
 
 
-The kernel driver is required to support mulitple virtual mice. They may also be running concurrently. Each mice may have their own:
+The kernel driver is required to support multiple virtual mice. They may also be running concurrently. Each mice may have their own:
 \begin{itemize}
 	\item Protocol
 	\item Name
@@ -117,20 +124,24 @@ Protocol and syntax on how to achieve each of these will be specified further in
 
 \newpage
 
-\subsection*{Design}
-\addcontentsline{toc}{subsection}{Design}
-
-The design of the kernel driver will attempt to comply with the S.O.L.I.D design principles\footnote{https://scotch.io/bar-talk/s-o-l-i-d-the-first-five-principles-of-object-oriented-design} as closely as realistically possible (as $C$ doesn't have classes).\\
+\subsection*{vmDevice structure}
 
 \noindent
-Figure \ref{fig:vmDevice} represents the \textit{vmDevice} structure which represents a virtual mouse. The \textit{cdev, dev, lock} fields are not pointers as they are individual to the device and hence should only be stored against the single device. However, multiple mouses can use the same protocol or IOCTL mechanics. 
+Figure \ref{fig:vmDevice} is a UML representation of the general software structure of \textit{vmDevice}. \textit{vmDevice} is an individual virtual mouse. A \textit{vmDevice}'s protocol is stored as a pointer as multiple mouse can use a single protocol. However, a \textit{cdev, dev, lock} is exclusive to the device and hence not pointers. \textit{vmDevice}'s structure is used to store its state and point to behavior. The ioctl() method mechanics is described in the \hyperref[sec:ioctl]{IOCTL Chain section}.\\
+
+\noindent
+\textit{vmProtocol} represents a mouse protocol; the bus protocol for example. System interactions following protocol are defined in \textit{fops}. Non-ioctl device interactions are routed to the \textit{fops} methods unless blocked by the \hyperref[sec:fopsproxy]{fops proxy}; by a lock for example. The ioctl() mechanics are described in \hyperref[sec:ioctl]{IOCTL Chain section}.\\
+
+\noindent
+\textit{vmLock} represents the access control system used by the device. Each of its methods responses are respective to the \textit{lock} attribute.
+
 \begin{figure}
 	\caption{vmDevice structure \& dependencies}
 	\label{fig:vmDevice}
 	\begin{center}
 		\begin{tikzpicture}
 		
-			\umlclass[x=-6]{struct vmDevice}{
+			\umlclass[x=-6]{vmDevice}{
 			+ char* name \\
 			+ vmProtocol*	protocol \\
 			+ vmLock lock \\
@@ -139,17 +150,37 @@ Figure \ref{fig:vmDevice} represents the \textit{vmDevice} structure which repre
 		...}{ioctl()};
 			
 			
-			\umlclass[x=-1]{vmProtocol}{
+			\umlclass[x=-1, y=2]{vmProtocol}{
 			+ char* name\\
 			+ file\_operations fops\\
 			...
-		}{};
+		}{ioctl()};
+	
+			\umlclass[x=-1,y=-3]{vmLock}{+ (void *) lock}{
+				+ int canRead()\\
+				+ int canWrite()\\
+				+ int isReadLocked()\\
+				+ int isWriteLocked()\\
+				+ void readLock()\\
+				+ void writeLock()\\
+				+ void rwLock()\\
+				+ void readUnlock()\\
+				+ void writeUnlock()\\
+				+ void rwUnlock()\\
+				+ void cleanup()
+
+	}
 			
-			\umlclass[x=3.5]{file\_operations}{}{(...fops methods)};
-			
-			\umlclass[y=-3]{vmIOCTL}{};
 		\end{tikzpicture}
 	\end{center}
 \end{figure}
+
+\subsection*{IOCTL Chain}
+\label{sec:ioctl}
+\addcontentsline{toc}{subsection}{IOCTL Chain}
+
+\subsection*{file\_operations proxy}
+\label{sec:fopsproxy}
+\addcontentsline{toc}{subsection}{file\_operations proxy}
 
 \end{document}
