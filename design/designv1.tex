@@ -102,7 +102,7 @@ The kernel driver is required to support multiple virtual mice. They may also be
 \begin{itemize}
 	\item Protocol
 	\item Name
-	\item Access control (Locking)
+	\item Access control
 	\item Input/Output Control (IOCTL) access
 \end{itemize}
 Furthermore it is required that mice can be added and removed during runtime. They may also be specificed as input parameters. To be more verbose, the kernel driver must be capable of:
@@ -122,29 +122,50 @@ Furthermore it is required that mice can be added and removed during runtime. Th
 \noindent
 Protocol and syntax on how to achieve each of these will be specified further into the initial development.
 
-\newpage
+\subsection*{VM Core}
+To better describe later sections the VM Core is defined. VM Core is the collection which contains the methods and variables required for bootstrapping vmDevices and passing on file\_operations. This is the \textit{module\_init}, \textit{module\_cleanup} and the base \textit{file\_operations}. At some stage in the VirtualHideout project it may be appropriate to move the core to its own driver. The VM Core appears as seen in figure \ref{fig:vmcore}\\
+
+\begin{figure}[h]
+	\caption{VM Core (simplified)}
+	\label{fig:vmcore}
+	\begin{center}
+\begin{tikzpicture}
+
+\umlclass{VmCore}{
+	+ vmDevice* devices\\
+	+ file\_operations* protocols\\
+	+ file\_operations coreOps
+}{
++ module\_init()\\
++ module\_cleanup()
+};
+
+\end{tikzpicture}
+\end{center}
+\end{figure}
 
 \subsection*{vmDevice structure}
+\label{subsec:vmdevice}
+\noindent
+Figure \ref{fig:vmDevice} is a UML representation of the general software structure of \textit{vmDevice}. \textit{vmDevice} is an individual virtual mouse. \textit{vmDevice}'s structure is used to store its state and point to behavior. The interaction with systems which handle mouse protocols is defined in the \textit{vmProtocol} attribute. The ioctl() method mechanics is described in the \hyperref[sec:ioctl]{IOCTL Chain section}.\\
 
 \noindent
-Figure \ref{fig:vmDevice} is a UML representation of the general software structure of \textit{vmDevice}. \textit{vmDevice} is an individual virtual mouse. A \textit{vmDevice}'s protocol is stored as a pointer as multiple mouse can use a single protocol. However, a \textit{cdev, dev, lock} is exclusive to the device and hence not pointers. \textit{vmDevice}'s structure is used to store its state and point to behavior. The ioctl() method mechanics is described in the \hyperref[sec:ioctl]{IOCTL Chain section}.\\
+\textit{vmProtocol} represents a mouse protocol; the bus protocol for example. System interactions following protocol are defined in \textit{fops}. Non-ioctl device interactions are routed to the \textit{fops} methods unless blocked by the \hyperref[sec:fopsproxy]{fops chain}; by a lock for example. The ioctl() mechanics are described in \hyperref[sec:ioctl]{IOCTL Chain section}. The fops ioctl function should only be used for protocol specific IOCTL commands. As of writing this, it is uncertain if such protocols exist, but they may do.\\
 
 \noindent
-\textit{vmProtocol} represents a mouse protocol; the bus protocol for example. System interactions following protocol are defined in \textit{fops}. Non-ioctl device interactions are routed to the \textit{fops} methods unless blocked by the \hyperref[sec:fopsproxy]{fops proxy}; by a lock for example. The ioctl() mechanics are described in \hyperref[sec:ioctl]{IOCTL Chain section}.\\
-
-\noindent
-\textit{vmLock} represents the access control system used by the device. Each of its methods responses are respective to the \textit{lock} attribute.
+\textit{vmAccess} represents the access control system used by the device. It is used to allow/deny access to protocol file\_operations or IOCTL actions.
 
 \begin{figure}
+
 	\caption{vmDevice structure \& dependencies}
-	\label{fig:vmDevice}
 	\begin{center}
+			\label{fig:vmDevice}
 		\begin{tikzpicture}
 		
 			\umlclass[x=-6]{vmDevice}{
 			+ char* name \\
-			+ vmProtocol*	protocol \\
-			+ vmLock lock \\
+			+ vmProtocol	protocol \\
+			+ vmAccess access \\
 			+ cdev cdev \\
 			+ dev\_t dev\\
 		...}{ioctl()};
@@ -152,35 +173,93 @@ Figure \ref{fig:vmDevice} is a UML representation of the general software struct
 			
 			\umlclass[x=-1, y=2]{vmProtocol}{
 			+ char* name\\
-			+ file\_operations fops\\
+			+ file\_operations* fops\\
+			+ vmProtocol* this\\
 			...
 		}{ioctl()};
 	
-			\umlclass[x=-1,y=-3]{vmLock}{+ (void *) lock}{
-				+ int canRead()\\
-				+ int canWrite()\\
-				+ int isReadLocked()\\
-				+ int isWriteLocked()\\
-				+ void readLock()\\
-				+ void writeLock()\\
-				+ void rwLock()\\
-				+ void readUnlock()\\
-				+ void writeUnlock()\\
-				+ void rwUnlock()\\
-				+ void cleanup()
-
-	}
+			\umlclass[x=-1,y=-2]{vmAccess}{
+			+ char* name\\
+			+ file\_operations}{}
 			
 		\end{tikzpicture}
 	\end{center}
 \end{figure}
 
+\subsection*{file\_operations chain}
+\label{sec:fopsproxy}
+\addcontentsline{toc}{subsection}{file\_operations chain}
+A chain of responsibility approach\footnote{https://refactoring.guru/design-patterns/chain-of-responsibility} is taken to handle requests. The head of the chain is the VM Core \textit{file\_operations}; does core checks and bootstrapping. Second is the \textit{vmAccess file\_operations} which is set by the user and determines if the request should be passed along to the protocol. Lastly is the \textit{vmProtocol file\_operations} which is executes the protocol/functionality. This design allows the VM Core control on which actions are allowed to occur. It allows users to define their own access rules. See figure \ref{fig:fopschain} for a sequence diagram.\\
+\noindent
+Regarding figure \ref{fig:fopschain}, the requests makes a call to the VM call via the interface lib (arrow named interface call). The VM Core can then reject the call if required. Typically, the request will be passed along to the vmAccess. vmAccess can then return 0 for denial and 1 for allowed. If it is 1, the request is passed along to get the protocol response which is then returned to the VM Core and then to the requester.
+\begin{figure}
+
+	\caption{file\_operations chain}
+	\begin{center}
+			\label{fig:fopschain}
+		\scalebox{0.8}[.8]{
+\begin{tikzpicture}
+	\begin{umlseqdiag}
+		\umlentity[no ddots]{Requester}
+		\umlobject[no ddots]{VM Core}
+		\umlobject[no ddots]{vmAccess}
+		\umlobject[no ddots]{vmProtocol}
+		\begin{umlcall}[op={Interface Call}]{Requester}{VM Core}
+		\begin{umlcall}[op={Pass along if valid}]{VM Core}{vmAccess}
+		\begin{umlcall}[type=return, op={Return 1 or 0}]{vmAccess}{VM Core}
+		\begin{umlcall}[op={Pass along if 1}, return={Protocol Response}]{VM Core}{vmProtocol}
+
+		\end{umlcall}
+				\begin{umlcall}[op={Protocol Response}]{VM Core}{Requester}
+		\end{umlcall}
+		\end{umlcall}
+		\end{umlcall}
+		\end{umlcall}
+	\end{umlseqdiag}
+\end{tikzpicture}
+}
+\end{center}
+\end{figure}
+
 \subsection*{IOCTL Chain}
 \label{sec:ioctl}
 \addcontentsline{toc}{subsection}{IOCTL Chain}
+\noindent
+IOCTL chain is very similar to the file\_operations chain. This chain handles IOCTL commands. IOCTL commands are passed along a chain for implementation simplicity. The difference between the two chains are 1) the chain passes the vmDevice ioctl() between vmAccess and vmProtocol 2) the vmProtocol uses the struct defined ioctl function before the fops ioctl\footnote{\hyperref[subsec:vmdevice]{See section vmDevice Structure}}. 
 
-\subsection*{file\_operations proxy}
-\label{sec:fopsproxy}
-\addcontentsline{toc}{subsection}{file\_operations proxy}
+\begin{figure}[h]
+	
+	\caption{ioctl chain}
+	\begin{center}
+		\label{fig:fopschain}
+		\scalebox{0.8}[.8]{
+			\begin{tikzpicture}
+			\begin{umlseqdiag}
+			\umlentity[no ddots]{Requester}
+			\umlobject[no ddots]{VM Core}
+
+			\umlobject[no ddots]{vmAccess}
+			\umlobject[no ddots]{vmDevice}
+			\umlobject[no ddots]{vmProtocol}
+			\begin{umlcall}[op={Interface Call}]{Requester}{VM Core}
+			\begin{umlcall}[op={Pass along if valid}]{VM Core}{vmAccess}
+			\begin{umlcall}[return={0 or 1 or value}, dt=6, op={Pass along if 1}]{VM Core}{vmDevice}
+			\end{umlcall}
+			\begin{umlcall}[type=return, op={Return 1 or 0}]{vmAccess}{VM Core}
+			\begin{umlcall}[op={Pass along if 0}, return={Protocol Response}, dt=8]{VM Core}{vmProtocol}
+			\begin{umlcallself}[op={fops ioctl}]{vmProtocol}
+			\end{umlcallself}
+			\end{umlcall}
+			\begin{umlcall}[op={Protocol Response}]{VM Core}{Requester}
+			\end{umlcall}
+			
+			\end{umlcall}
+			\end{umlcall}
+			\end{umlcall}
+			\end{umlseqdiag}
+			\end{tikzpicture}
+		}
+	\end{center}
+\end{figure}
 
 \end{document}
