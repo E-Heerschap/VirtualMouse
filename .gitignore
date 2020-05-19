@@ -1,0 +1,11 @@
+*.aux
+*.lof
+*.lot
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.swn
+*.swp
+*.swo
+*.tikzstyles

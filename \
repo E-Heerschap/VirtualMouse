@@ -12,11 +12,8 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
-#include "vmdefines.h"
 #include "vmtypes.h"
 #include "vmdebug.h"
-#include "protocol/protocol.h"
-#include "access/access.h"
 
 #define VM_BASE_MINOR 0
 #define VM_DEVMEMALLOC argMinorCount //Number of vmDevices to initially
@@ -25,10 +22,12 @@
 #define VM_DRIVER_NAME "Virtual Mouse"
 #ifndef VM_MAJOR
 #define VM_MAJOR 0
+#define VM_ERROR = 1; // Non-fatal error
+#define VM_FAILURE = -1; //Fatal error
+#define VM_SUCCESS = 0; // =D
 #endif
 #define VM_MINOR_TYPE ushort //Required because preprocessor is unaware of
 //typedef declarations and minor_t (below) is required in module_param macro.
-#define VM_ARG_TYPE short
 #define WORLD_READABLE 0444
 
 
@@ -36,7 +35,6 @@ typedef VM_MINOR_TYPE minor_t;
 typedef struct vmAccess vmAccess; /////////////////////////
 typedef struct vmProtocol vmProtocol; // Might never need extra abstraction :)
 typedef struct vmDevice vmDevice;/////////////////////////
-typedef VM_ARG_TYPE arg_t;
 
 /////////////////////////////////////
 // Module information
@@ -53,16 +51,16 @@ module_param(argMinorCount, VM_MINOR_TYPE, WORLD_READABLE);
 MODULE_PARM_DESC(argMinorCount, "Number of minor numbers to allocate." \
 		"This will be the maximum number of mice allocatable.\n");//For now
 
-static arg_t argProtocol = 0;
-module_param(argProtocol, VM_ARG_TYPE, WORLD_READABLE);
+static unsigned short argProtocol = 1;
+module_param(argProtocol, unsigned short, WORLD_READABLE);
 MODULE_PARM_DESC(argProtocol, "Default protocol to use for mice\n");
 
-static arg_t argAccess = 0;
-module_param(argAccess, VM_ARG_TYPE, WORLD_READABLE);
+static unsigned short argAccess = 1;
+module_param(argAccess, unsigned short, WORLD_READABLE);
 MODULE_PARM_DESC(argAccess, "Default access to use for mice\n");
 
-static arg_t argMiceCount = 1;
-module_param(argMiceCount, VM_ARG_TYPE, WORLD_READABLE);
+static unsigned short argMiceCount = 1;
+module_Param(argMiceCount, unsigned short, WORLD_READABLE);
 MODULE_PARM_DESC(argMiceCount, "Number of mice to create on startup.");
 
 ///////////////////////////////////
@@ -73,87 +71,34 @@ static unsigned int vmMajor;
 
 static vmDevice* vmDevices;
 
-static int vmCoreOpen(struct inode * in, struct file * filp) {
-	
-	vmDevice * device;
-	int result = 0;
-
-	device = container_of(in->i_cdev, vmDevice, cdev);
-
-	VM_DEBUG("vmCoreOpen()");
-
-	filp->private_data = device;
-	
-	//Checking access
-	if (device->access->fops->open != NULL) {
-		if ((result = device->access->fops->open(in, filp)) 
-				!= VM_SUCCESS) {
-			VM_DEBUGVARS("Device access open failed! Code: %d\n",
-					result);
-			return result;
-		}
-	}
-	
-	//Passing to protocol
-	if (device->protocol->fops->open != NULL) {
-		return device->protocol->fops->open(in, filp);	
-	}
-
-	return VM_SUCCESS;
-
-}
-
-static int argValidation(void) {
+static unsigned int argValidation(void) {
 
 	if (VM_DEVMEMALLOC < argMiceCount) {
 		//TODO Make the allocated memory expand dynamically in future.
 		printk(KERN_ALERT "Virtual Mouse cannot start %u mice. "\
-				"Maximum with compiled system is %d. To "\
-				"change maximum use compile with KCFLAG "\
-				"-D VM_DEVMEMALLOC=x\n"\
-				"Starting with %d mice.\n", argMiceCount,\
-				VM_DEVMEMALLOC, VM_DEVMEMALLOC);
+				"Maximum with compiled system is %d. To change "\ 
+				"maximum use compile with KCFLAG "\
+				"-D VM_DEVMEMALLOC=x\n" \
+				"Starting with %d mice.", argMiceCount, \
+				VM_DEVMALLOC, VM_DEVMEMALLOC);
 
 		return VM_ERROR;
 	}
-
-	//TODO Have default vmAccess and vmProtocol to fall back on
 	
 	//-1 as VM_ACCESS_COUNT starts at 1.
 	if (argAccess > VM_ACCESS_COUNT - 1 || argAccess < 0 )
 	{
 		printk(KERN_ALERT "Invalid argAccess argument. Maximum is %d " \
-				"and minimum is 0\n", VM_ACCESS_COUNT);
+				"and minimum is 0", VM_ACCESS_COUNT);
 		return VM_FATAL;
 	}
 
-	if (argProtocol > VM_PROTOCOL_COUNT - 1 || argProtocol < 0)
-	{
-		printk(KERN_ALERT "Invalid argProtocol argument. Maximum is " \
-				"%d and minimum is 0\n", VM_PROTOCOL_COUNT);
-		return VM_FATAL;
-	}
-	
-	return VM_SUCCESS;	
-
 }
-
-void deviceCleanUp(vmDevice * vmd)
-{
-
-	NULL_CHECK_CALL_SELF(vmd->protocol, cleanup);
-	NULL_CHECK_CALL_SELF(vmd->access, cleanup);
-}
-
-
-static struct file_operations vmCoreFops = {
-	.owner = THIS_MODULE,
-	.open = vmCoreOpen
-};
 
 static int __init vmCoreInit(void)
 {
 
+	minor_t devNum = VM_BASE_MINOR;
 	dev_t firstDev = 0;
 	int result = 0, vmDeviceSize = 0, devCount = 0;
 	vmDevice* device;
@@ -190,18 +135,14 @@ static int __init vmCoreInit(void)
 	memset(vmDevices, 0, VM_DEVMEMALLOC * vmDeviceSize);
 
 	for (devCount = 0; devCount < argMiceCount; devCount++) {
-		
+
 		device = &vmDevices[devCount];
 		device->access = accessFactories[argAccess](); //access/access.h
-		device->protocol = protocolFactories[argProtocol]();
-		device->ioctl = NULL; //TODO SETUP THIS		
-		device->cleanup = deviceCleanUp;
-		cdev_init(&device->cdev, &vmCoreFops);
-		device->dev = MKDEV(vmMajor, devCount);
-		cdev_add(&device->cdev, device->dev, 1);
 
 	}
  
+	// TODO Implement loading mice from start up parameters.
+	
 	
 	printk(KERN_NOTICE "Virtual Mouse started successfully\n");
 
@@ -234,8 +175,6 @@ static void __exit vmCoreExit(void)
 				VM_DEBUGVARS("vmDevice[%d] not null\n", devNo)
 
 				// TODO Clean vmDevice!
-				VM_OC_R_(vmDevices[devNo], cleanup);
-				cdev_del(&vmDevices[devNo].cdev);
 			}
 
 			#ifdef VM_DEBUG_ENABLE

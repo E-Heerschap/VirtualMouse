@@ -262,4 +262,8 @@ IOCTL chain is very similar to the file\_operations chain. This chain handles IO
 	\end{center}
 \end{figure}
 
+\subsection*{vmAccess Creation Managment}
+\addcontentsline{toc}{subsection}{vmAccess factories and initializers}
+\textit{vmAccess} structures are intended to be modular (not dependent on \textit{vmProtocol} or \textit{vmDevice}). Managing the creation for the different \textit{vmAccess} definitions requires a generic implementation that limits flexibility restrictions as much as possible.
+
 \end{document}
