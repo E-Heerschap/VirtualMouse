@@ -16,11 +16,19 @@ static int busOpen(struct inode * in, struct file * filp)
 	return 0;
 }
 
+static ssize_t busRead (struct file * filp, char* __user buf, size_t size,
+		loff_t* off) {
+
+	printk(KERN_ALERT "BUS PROTOCOL READ!\n");
+	return 0;	
+
+}
+
 static struct file_operations fopsBUS = {
 	
 	.owner = THIS_MODULE,
-	.open = busOpen
-	
+	.open = busOpen,
+ 	.read = busRead	
 };
 
 

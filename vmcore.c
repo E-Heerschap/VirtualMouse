@@ -73,6 +73,11 @@ static unsigned int vmMajor;
 
 static vmDevice* vmDevices;
 
+
+/*******************************************************************
+ * file_operations managment for vmCore
+ *******************************************************************/
+
 /**
  * Calls the file operations on the accessFOP and protocolFOP. 
  * If the access returns VM_FAILURE in the first byte, it is successful and the 
@@ -94,7 +99,7 @@ static vmDevice* vmDevices;
 	\
 	if (protocolFOP != NULL) { \
 		data = protocolFOP(args); \
-	}\
+	}
 
 
 static int vmCoreOpen(struct inode * in, struct file * filp) {
@@ -113,6 +118,22 @@ static int vmCoreOpen(struct inode * in, struct file * filp) {
 			result, in, filp);
 	return result;
 }
+
+static ssize_t vmCoreRead(struct file * filp, char* __user buf, size_t size,
+	       	loff_t* off){
+
+	vmDevice * device = filp->private_data;
+	ssize_t result = 0;
+	vmCoreFOPHandler(device->access->fops->read,
+		device->protocol->fops->read,
+		result, filp, buf, size, off);
+	return result;
+
+}
+
+/*******************************************************************
+ * End of file_operations managment
+ ********************************************************************/
 
 static int argValidation(void) {
 
@@ -159,7 +180,8 @@ void deviceCleanUp(vmDevice * vmd)
 
 static struct file_operations vmCoreFops = {
 	.owner = THIS_MODULE,
-	.open = vmCoreOpen
+	.open = vmCoreOpen,
+	.read = vmCoreRead
 };
 
 static int __init vmCoreInit(void)
