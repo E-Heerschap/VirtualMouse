@@ -73,6 +73,30 @@ static unsigned int vmMajor;
 
 static vmDevice* vmDevices;
 
+/**
+ * Calls the file operations on the accessFOP and protocolFOP. 
+ * If the access returns VM_FAILURE in the first byte, it is successful and the 
+ * call to the protocol with the same arguments will then be made. Otherwise,
+ * it should return VM_FAILURE;
+ *
+ * @accessFOP Type: vmAccess
+ * @protocolFOP type: vmProtocol
+ * @data Is the variable to store the result data in. A caveat is if the access
+ * fails, then the data variables first byte will be -1;
+ */
+#define vmCoreFOPHandler(accessFOP, protocolFOP, data, args...) \
+	if (accessFOP != NULL) { \
+		data = accessFOP(args); \
+		if ((char) data != (char) VM_SUCCESS) { \
+			VM_DEBUG("Acceess to "#accessFOP" is denied!"); \
+		}\
+	}\
+	\
+	if (protocolFOP != NULL) { \
+		data = protocolFOP(args); \
+	}\
+
+
 static int vmCoreOpen(struct inode * in, struct file * filp) {
 	
 	vmDevice * device;
@@ -84,23 +108,10 @@ static int vmCoreOpen(struct inode * in, struct file * filp) {
 
 	filp->private_data = device;
 	
-	//Checking access
-	if (device->access->fops->open != NULL) {
-		if ((result = device->access->fops->open(in, filp)) 
-				!= VM_SUCCESS) {
-			VM_DEBUGVARS("Device access open failed! Code: %d\n",
-					result);
-			return result;
-		}
-	}
-	
-	//Passing to protocol
-	if (device->protocol->fops->open != NULL) {
-		return device->protocol->fops->open(in, filp);	
-	}
-
-	return VM_SUCCESS;
-
+	vmCoreFOPHandler(device->access->fops->open,
+			device->protocol->fops->open,
+			result, in, filp);
+	return result;
 }
 
 static int argValidation(void) {
