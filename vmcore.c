@@ -15,8 +15,10 @@
 #include "vmdefines.h"
 #include "vmtypes.h"
 #include "vmdebug.h"
+//#include "vmioctl.h"
 #include "protocol/protocol.h"
 #include "access/access.h"
+
 
 #define VM_BASE_MINOR 0
 #define VM_DEVMEMALLOC argMinorCount //Number of vmDevices to initially
@@ -131,6 +133,70 @@ static ssize_t vmCoreRead(struct file * filp, char* __user buf, size_t size,
 
 }
 
+
+#define __IOCTLChainLen 3
+static struct __IOCTLChain {
+    long (*ioctls[__IOCTLChainLen]) (struct file*, unsigned int, unsigned long);
+    const long (*handler) (struct __IOCTLChain*, struct file*,
+                           unsigned int, unsigned long);
+    const void (*buildChain) (struct __IOCTLChain *, vmDevice);
+}
+
+static long __IOCTLChainHandler(
+		const __IOCTLChain * chain,
+		struct file * filp,
+		unsigned int ioctlNum,
+		unsigned long ptr
+		) {
+	long result;
+	for(u8 count = 0; count < chain->len; count++) {
+		if (chain->ioctl[count] != NULL){
+			result = chain->ioctls[count](filp, ioctlNum, ptr);
+			if (result != ENOIOCTLCMD) { return result };
+		}
+	}
+
+	return ENOIOCTLCMD;
+}
+
+static void __IOCTLChainBuild(__IOCTLChain * chain, const vmDevice * device) {
+	chain->ioctls = { device->ioctl,
+		device->protocol->ioctl,
+		device->fops->ioctl };
+}
+
+static __IOCTLChain* __getIOCTLChain(void) {
+
+    return __IOCTLChain{{NULL,NULL,NULL},__IOCTLChainHandler,__IOCTLChainBuild};
+
+}
+
+
+static long vmCoreIOCTL(struct file * filp, unsigned int ioctlNum,
+	       	unsigned long ptr) {
+
+	long result = NULL;
+	vmDevice * device = filp->private_data;
+	struct __IOCTLChain chain = __getIOCTLChain();
+	VM_AOC_R_(chain, buildChain, device);
+
+	//TODO Add core IOCTL commands :)
+	
+	//IOCTL chain is different from the rest of the file_operations.
+	//See the design document.
+	//   |	
+	//   v	in access/access.h
+	if (VM_ACCESS_ALLOWED(device->access->fops->ioctl,
+			       	ioctl, filp, ioctlNum, ptr)) {
+			
+		return VM_AOC_R_(chain, handler, filp, ioctlNum, ptr);
+		
+	} else {
+		return EACCES; //Permission denied
+	}
+
+}
+*/
 /*******************************************************************
  * End of file_operations managment
  ********************************************************************/

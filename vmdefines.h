@@ -16,7 +16,13 @@
 #define VM_POC_R_(self, call) self->call(self);  // POC = Pointer object call
 #define VM_POC_C_(self, call) self->call(self*); // R = reference, C = copy
 #define VM_OC_R_(self, call) self.call(&self);   // OC = Object call 
-#define VM_OC_C_(self, call) self.call(self);    /////////////////////////
+#define VM_OC_C_(self, call) self.call(self);    // APOC = Argument POC
+                                                 // AOC = Argument OC
+#define VM_APOC_R_(self, call, args...) self->call(self, args);
+#define VM_APOC_C_(self, call, args...) self->call(self*, args);
+#define VM_AOC_R_(self, call, args...) self.call(&self, args); 
+#define VM_AOC_C_(self, call, args...) self.call(self, args);
+
 
 //Checks if fields are null before attempting to call "call".
 #define NULL_CHECK_CALL_SELF(ptr, call) \
