@@ -22,7 +22,7 @@ struct vmAccess {
 struct vmProtocol {
 	char* name;
 	struct file_operations* fops;
-	int (*ioctl) (struct inode*, struct file*, unsigned int, unsigned long);
+	int (*ioctl) (struct file*, unsigned int, unsigned long);
 	void (*cleanup) (struct vmProtocol *);
 };
 
@@ -34,7 +34,7 @@ struct vmDevice {
 	struct vmAccess* access;
 	struct cdev cdev;
 	dev_t dev;
-	int (*ioctl) (struct inode *, struct file*, unsigned int, unsigned long);
+	int (*ioctl) (struct file*, unsigned int, unsigned long);
 	void (*cleanup) (struct vmDevice *);
 
 };

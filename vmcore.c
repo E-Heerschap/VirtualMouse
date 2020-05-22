@@ -15,7 +15,7 @@
 #include "vmdefines.h"
 #include "vmtypes.h"
 #include "vmdebug.h"
-//#include "vmioctl.h"
+#include "vmioctl.h"
 #include "protocol/protocol.h"
 #include "access/access.h"
 
@@ -134,69 +134,46 @@ static ssize_t vmCoreRead(struct file * filp, char* __user buf, size_t size,
 }
 
 
-#define __IOCTLChainLen 3
-static struct __IOCTLChain {
-    long (*ioctls[__IOCTLChainLen]) (struct file*, unsigned int, unsigned long);
-    const long (*handler) (struct __IOCTLChain*, struct file*,
-                           unsigned int, unsigned long);
-    const void (*buildChain) (struct __IOCTLChain *, vmDevice);
-}
+//Macro implementation of the IOCTL chain checks.
+//Appear cleaner and more efficient that struct implementation;
+//see commit 14383950dd1ed26f1731318a09c6683da3bb8a96.
+//Do not use these macros outside of vmCoreIOCTL function.
+#define __IOCTLArgFile filp
+#define __IOCTLArgNum ioctlNum
+#define __IOCTLArgPtr ptr
+#define __IOCTLVarResult result
+#define __IOCTLCallAndCheck(obj,call) \
+    if (obj->call != NULL) { \
+        __IOCTLVarResult = obj->call(__IOCTLArgFile, __IOCTLArgNum, __IOCTLArgPtr); \
+        if (result != ENOIOCTLCMD) { return result; } \
+    } \
 
-static long __IOCTLChainHandler(
-		const __IOCTLChain * chain,
-		struct file * filp,
-		unsigned int ioctlNum,
-		unsigned long ptr
-		) {
-	long result;
-	for(u8 count = 0; count < chain->len; count++) {
-		if (chain->ioctl[count] != NULL){
-			result = chain->ioctls[count](filp, ioctlNum, ptr);
-			if (result != ENOIOCTLCMD) { return result };
-		}
-	}
+static long vmCoreIOCTL(struct file * __IOCTLArgFile, unsigned int __IOCTLArgNum,
+	       	unsigned long __IOCTLArgPtr) {
 
-	return ENOIOCTLCMD;
-}
-
-static void __IOCTLChainBuild(__IOCTLChain * chain, const vmDevice * device) {
-	chain->ioctls = { device->ioctl,
-		device->protocol->ioctl,
-		device->fops->ioctl };
-}
-
-static __IOCTLChain* __getIOCTLChain(void) {
-
-    return __IOCTLChain{{NULL,NULL,NULL},__IOCTLChainHandler,__IOCTLChainBuild};
-
-}
-
-
-static long vmCoreIOCTL(struct file * filp, unsigned int ioctlNum,
-	       	unsigned long ptr) {
-
-	long result = NULL;
+	long __IOCTLVarResult = 0;
 	vmDevice * device = filp->private_data;
-	struct __IOCTLChain chain = __getIOCTLChain();
-	VM_AOC_R_(chain, buildChain, device);
 
-	//TODO Add core IOCTL commands :)
+    //TODO Add core IOCTL commands :)
 	
 	//IOCTL chain is different from the rest of the file_operations.
 	//See the design document.
 	//   |	
 	//   v	in access/access.h
-	if (VM_ACCESS_ALLOWED(device->access->fops->ioctl,
-			       	ioctl, filp, ioctlNum, ptr)) {
-			
-		return VM_AOC_R_(chain, handler, filp, ioctlNum, ptr);
-		
+	if (VM_ACCESS_ALLOWED(device->access->fops,
+			       	unlocked_ioctl, filp, ioctlNum, ptr)) {
+
+	    __IOCTLCallAndCheck(device, ioctl);
+	    __IOCTLCallAndCheck(device->protocol, ioctl);
+	    __IOCTLCallAndCheck(device->protocol->fops, unlocked_ioctl);
+
+	    return ENOIOCTLCMD;
 	} else {
 		return EACCES; //Permission denied
 	}
 
 }
-*/
+
 /*******************************************************************
  * End of file_operations managment
  ********************************************************************/
@@ -247,7 +224,8 @@ void deviceCleanUp(vmDevice * vmd)
 static struct file_operations vmCoreFops = {
 	.owner = THIS_MODULE,
 	.open = vmCoreOpen,
-	.read = vmCoreRead
+	.read = vmCoreRead,
+	.unlocked_ioctl = vmCoreIOCTL
 };
 
 static int __init vmCoreInit(void)
