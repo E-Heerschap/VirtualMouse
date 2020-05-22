@@ -2,7 +2,8 @@
 
 A virtual mouse driver for linux.
 
-##Development environment
+## Development environment
+
 A few notes about the development environment:
 Use the Vagrantbuildsystem repository to setup a virtual machine that (should)
 be equipped to compile kernel modules. The build directory has a symbolic link
