@@ -5,8 +5,8 @@
 #define _VM_IOCTL_H
 #include <asm-generic/ioctl.h>
 
-#define VM_PROTOCOL_BUS_RIGHT_CLICK 0x01;
-#define VM_PROTOCOL_BUS_LEFT_CLICK 0x04;
+#define VM_PROTOCOL_RIGHT_CLICK 0x01
+#define VM_PROTOCOL_LEFT_CLICK 0x04
 
 struct vmMouseEvent {
 
