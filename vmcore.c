@@ -105,8 +105,9 @@ static vmDevice* vmDevices;
 
 
 static int vmCoreOpen(struct inode * in, struct file * filp) {
-	
+
 	vmDevice * device;
+
 	int result = 0;
 
 	device = container_of(in->i_cdev, vmDevice, cdev);
@@ -133,6 +134,17 @@ static ssize_t vmCoreRead(struct file * filp, char* __user buf, size_t size,
 
 }
 
+static __poll_t vmCorePoll(struct file * filp, struct poll_table_struct * pts) {
+
+    vmDevice* device = filp->private_data;
+    __poll_t result = 0;
+    vmCoreFOPHandler(device->access->fops->poll,
+            device->protocol->fops->poll,
+            result, filp, pts);
+    return result;
+
+}
+
 
 //Macro implementation of the IOCTL chain checks.
 //Appear cleaner and more efficient that struct implementation;
@@ -150,6 +162,8 @@ static ssize_t vmCoreRead(struct file * filp, char* __user buf, size_t size,
 
 static long vmCoreIOCTL(struct file * __IOCTLArgFile, unsigned int __IOCTLArgNum,
 	       	unsigned long __IOCTLArgPtr) {
+
+    VM_DEBUG("vmCoreIOCTL Opened\n");
 
 	long __IOCTLVarResult = 0;
 	vmDevice * device = filp->private_data;
@@ -172,6 +186,15 @@ static long vmCoreIOCTL(struct file * __IOCTLArgFile, unsigned int __IOCTLArgNum
 		return EACCES; //Permission denied
 	}
 
+}
+
+static int vmCoreFasync(int fd, struct file *filp, int on){
+    vmDevice* device = filp->private_data;
+    int result = 0;
+    vmCoreFOPHandler(device->access->fops->fasync,
+            device->protocol->fops->fasync, result,
+            fd, filp, on);
+    return result;
 }
 
 /*******************************************************************
@@ -218,6 +241,7 @@ void deviceCleanUp(vmDevice * vmd)
 
 	NULL_CHECK_CALL_SELF(vmd->protocol, cleanup);
 	NULL_CHECK_CALL_SELF(vmd->access, cleanup);
+
 }
 
 
@@ -225,7 +249,9 @@ static struct file_operations vmCoreFops = {
 	.owner = THIS_MODULE,
 	.open = vmCoreOpen,
 	.read = vmCoreRead,
-	.unlocked_ioctl = vmCoreIOCTL
+	.unlocked_ioctl = vmCoreIOCTL,
+	.poll = vmCorePoll,
+	.fasync = vmCoreFasync
 };
 
 static int __init vmCoreInit(void)
@@ -310,7 +336,7 @@ static void __exit vmCoreExit(void)
 
 				VM_DEBUGVARS("vmDevice[%d] not null\n", devNo)
 
-				// TODO Clean vmDevice!
+				// TODO Clean vmDevice (object itself)!
 				VM_OC_R_(vmDevices[devNo], cleanup);
 				cdev_del(&vmDevices[devNo].cdev);
 			}

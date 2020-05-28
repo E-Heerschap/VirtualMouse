@@ -10,11 +10,15 @@
 #ifdef VM_DEBUG_ENABLE
 	#define VM_DBGPFX "Virtual Mouse Debug: "
 	#define VM_DEBUG(x) printk(KERN_ALERT VM_DBGPFX x);
-	#define VM_DEBUGVARS(x,v) printk(KERN_ALERT VM_DBGPFX x, v); 
+	#define VM_DEBUGVARS(x,v...) printk(KERN_ALERT VM_DBGPFX x, v);
+    #define VM_DEBUGIF(cond, x) if (cond) printk(KERN_ALERT VM_DBGPFX x);
+    #define VM_DEBUGIFVARS(cond, x, v...) if (cond) printk(KERN_ALERT VM_DBGPFX x, v)
 #else
 	#define VM_DEBUG(x)
-	#define VM_DEBUGVARS(x,v)
+	#define VM_DEBUGVARS(x,v...)
 	#define VM_DBGPFX
+    #define VM_DEBUGIF(cond, x) cond
+    #define VM_DEBUGIFVARS(cond, x, v....) cond
 #endif
 
 #endif
