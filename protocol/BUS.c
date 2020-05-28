@@ -18,7 +18,7 @@
 #include "../vmtypes.h"
 #include "../vmioctl.h"
 
-#define VM_PROTOCOL_BUS_BUFFER_LEN 50
+#define VM_PROTOCOL_BUS_BUFFER_LEN 1024
 
 /**
  * This should be accessed via container_of macro from the protocol pointer
@@ -124,7 +124,7 @@ static ssize_t busRead (struct file * filp, char* __user buf, size_t size,
     set_current_state(TASK_RUNNING);
     event = getCurrentEvent(protocol);
 
-    if (event->dx + event->dy == 0) {
+    if (event->dx == 0 || event->dy == 0) {
         if (incrementRead(protocol)) {
             VM_DEBUG("Read failed to increment!");
         }
@@ -153,7 +153,7 @@ static ssize_t busRead (struct file * filp, char* __user buf, size_t size,
     }
 
     //Buttons
-    event->buttons = event->buttons | 0x80; //Setting the 128 bit
+    event->buttons = event->buttons | (unsigned) 0x80; //Setting the 128 bit
     byteData[0] = event->buttons;
 
     VM_DEBUGVARS("DATA TO COPY %x %x %x", byteData[0], byteData[1], byteData[2]);
