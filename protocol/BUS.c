@@ -153,8 +153,8 @@ static ssize_t busRead (struct file * filp, char* __user buf, size_t size,
     }
 
     //Buttons
-    event->buttons = event->buttons | (unsigned) 0x80; //Setting the 128 bit
-    byteData[0] = event->buttons;
+    setButtonsFromByte(&event->buttons, buttonsToByte(&event->buttons) | (unsigned) 0x80); //Setting the 128 bit
+    byteData[0] = buttonsToByte(&event->buttons);
 
     VM_DEBUGVARS("DATA TO COPY %x %x %x", byteData[0], byteData[1], byteData[2]);
 

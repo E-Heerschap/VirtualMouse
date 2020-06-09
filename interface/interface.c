@@ -3,10 +3,34 @@
 //
 
 #include <sys/ioctl.h>
+#include <fcntl.h>      /* open */
+#include <unistd.h>     /* exit */
 #include "../vmioctl.h"
 
 
 typedef struct vmMouseEvent vmMouseEvent;
+
+/*
+ * Methods for opening file and grabbing file descriptor
+ * as some non-native languages do not support this (Java for example)
+ */
+
+/**
+ *
+ * @param path Path to device node to open.
+ * @return value of open(path);
+ */
+int getFileDesc(char* path) {
+    return open("/dev/vmouse0", 0);
+}
+
+/**
+ * Closes the file descriptor
+ * @param fd file descriptor to close
+ */
+void closeFileDesc(int fd) {
+    close(fd);
+}
 
 int fdSendIOCTLEvent(int file_desc, const vmMouseEvent* event) {
 
@@ -28,19 +52,19 @@ int fdSendIOCTLEvents(int file_desc, const vmMouseEvent* events, const unsigned 
     return retVal;
 }
 
-vmMouseEvent combineEvents(const vmMouseEvent* ev1, const vmMouseEvent* ev2) {
+vmMouseEvent addMouseEvents(const vmMouseEvent* ev1, const vmMouseEvent* ev2) {
 
     vmMouseEvent event = {
             .dx = ev1->dx + ev2->dx,
             .dy = ev1->dy + ev2->dy,
-            .buttons = ev1->buttons | ev2->buttons
+            .buttons = addButtons(&ev1->buttons, &ev2->buttons)
     };
 
     return event;
 
 }
 
-vmMouseEvent vmBuildMouseEvent(const int dx, const int dy, const char buttons) {
+vmMouseEvent buildMouseEvent(const int dx, const int dy, const Buttons buttons) {
 
     struct vmMouseEvent event = {
             .dy = dy,
@@ -54,25 +78,25 @@ vmMouseEvent vmBuildMouseEvent(const int dx, const int dy, const char buttons) {
 
 vmMouseEvent noneEvent(void) {
 
-    return vmBuildMouseEvent(0,0,0);
+    return buildMouseEvent(0, 0, buttonsFromByte((char) 0));
 
 }
 
 vmMouseEvent leftDownEvent(void) {
 
-    return vmBuildMouseEvent(0,0,VM_PROTOCOL_LEFT_CLICK);
+    return buildMouseEvent(0, 0, VM_PROTOCOL_LEFT_CLICK);
 
 }
 
 vmMouseEvent rightDownEvent(void) {
 
-    return vmBuildMouseEvent(0,0,VM_PROTOCOL_RIGHT_CLICK);
+    return buildMouseEvent(0, 0, VM_PROTOCOL_RIGHT_CLICK);
 
 }
 
 vmMouseEvent moveEvent(int x, int y) {
 
-    return vmBuildMouseEvent(x,y,0x00);
+    return buildMouseEvent(x, y, buttonsFromByte((char) 0));
 
 }
 

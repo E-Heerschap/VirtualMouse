@@ -9,7 +9,7 @@
 
 typedef struct vmMouseEvent vmMouseEvent;
 
-struct vmMouseEvent vmBuildMouseEvent(int dx, int dy, char buttons);
+struct vmMouseEvent buildMouseEvent(int dx, int dy, char buttons);
 
 int fdSendIOCTLEvent(int file_desc, const vmMouseEvent* event);
 

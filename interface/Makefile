@@ -1,5 +1,5 @@
 soFile : interface.o
-	gcc -Wall interface.o -shared -o libvm.so
+	gcc -D VM_EXPORT_GET_BUTTONS -Wall interface.o -shared -o libvm.so
 
 interface.o : ../vmioctl.h
 	gcc -Wall -c -fPIC interface.c -o interface.o
