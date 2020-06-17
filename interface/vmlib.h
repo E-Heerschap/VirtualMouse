@@ -1,4 +1,5 @@
-//
+// Contains definitions for userspace only code. This builds ontop of the vmioctl.h file
+// which contains the structures used to communicate between the two.
 // Created by edwin on 2020-05-27.
 //
 

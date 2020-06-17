@@ -10,12 +10,12 @@
  * as an opaque data type.
  */
 #ifdef VM_EXPORT_GET_BUTTONS
-Buttons getRightClick(void) {
+    Buttons getRightClick(void) {
         return VM_PROTOCOL_RIGHT_CLICK;
     }
 
     Buttons getLeftClick(void) {
-        return VVM_PROTOCOL_LEFT_CLICK;
+        return VM_PROTOCOL_LEFT_CLICK;
     }
 #endif
 

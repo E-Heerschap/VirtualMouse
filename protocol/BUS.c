@@ -16,7 +16,7 @@
 #include <linux/sched/signal.h>
 #include "../vmdebug.h"
 #include "../vmtypes.h"
-#include "../vmioctl.h"
+#include "../interface/vmioctl.h"
 
 #define VM_PROTOCOL_BUS_BUFFER_LEN 1024
 

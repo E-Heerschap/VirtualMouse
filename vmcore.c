@@ -15,7 +15,7 @@
 #include "vmdefines.h"
 #include "vmtypes.h"
 #include "vmdebug.h"
-#include "vmioctl.h"
+#include "interface/vmioctl.h"
 #include "protocol/protocol.h"
 #include "access/access.h"
 

@@ -1,19 +1,25 @@
-//IOCTL Definitions for VM system
-//Author: Edwin Heerschap
+/*
+* Contains IOCTL definitions, structures and
+* functions/macros shared between userspace and kernel space code.
+* This differs from the interface.h/interface.c files which are used
+* ONLY in userspace code.
+*
+* Author: Edwin Heerschap
+*/
 
 #ifndef _VM_IOCTL_H
 #define _VM_IOCTL_H
 #include <asm-generic/ioctl.h>
 
 /**
- * Use buttons type instead.
+ * Use buttons type instead. This is a concrete implementation and should not be directly used.
  */
 struct __Buttons {
   char _buttons;
 };
 
 /**
- * Use as opaque type.
+ * Use as opaque type with macros and functions below.
  */
 typedef struct __Buttons Buttons;
 

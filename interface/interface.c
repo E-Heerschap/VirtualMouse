@@ -5,7 +5,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>      /* open */
 #include <unistd.h>     /* exit */
-#include "../vmioctl.h"
+#include "vmioctl.h"
 
 
 typedef struct vmMouseEvent vmMouseEvent;
@@ -75,6 +75,8 @@ vmMouseEvent buildMouseEvent(const int dx, const int dy, const Buttons buttons) 
     return event;
 
 }
+
+//TODO Convert these to macros and export functions using a flag
 
 vmMouseEvent noneEvent(void) {
 
