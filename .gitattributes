@@ -1,3 +1,4 @@
 *.tex linguist-detectable=false
 *.c linguist-detectable=true
-*.sty linguist-detectable=false
+*.sty linguest-detectable=false
+design/* -linguist-vendored
