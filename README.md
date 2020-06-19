@@ -10,7 +10,7 @@ VirtualMouse is designed for version 5.4.x for the Linux Kernel. This kernel mod
 The VM_DEBUG_ENABLE flag can be set to enable debug messages. This is the default in the `build.sh` script.
 
 ### Libvm
-The library for VirtualMouse interaction is located in the `/interface` folder. It is build by running `make`. By default it runs with the flag `VM_EXPORT_GET_BUTTONS` which exports get methods for typical buttons for non-native languages which cannot access the definitions.
+The library for VirtualMouse interaction is located in the `/interface` folder. It is built by running the Makefile. By default it runs with the flag `VM_EXPORT_GET_BUTTONS` which exports get methods for typical buttons for non-native languages which cannot access the definitions.
 
 ## X11 configuration
 The X window system can be configured to use specific devices. In some cases this is necesary if the X window system does not
