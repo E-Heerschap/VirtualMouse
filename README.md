@@ -2,6 +2,41 @@
 
 Virtual mouse drivers for linux.
 
+## X11 configuration
+The X window system can be configured to use specific devices. In some cases this is necesary if the X window system does not
+automatically detect the device. For example, the current BUS protocol implementation for a virtual mouse is not automatically detected by the X window system. If this is the case, the `AutoAddDevices` X server flag needs to be set to false in the X server configuration. For example:
+
+```
+Section "ServerFlags"
+
+  Option "AutoAddDevices" "False"
+  
+EndSection
+```
+
+An input device for the virtual mouse needs to also be specified in the configuration. The follow example show a mouse implementing the BusMouse protocol running on the /dev/vmouse0 node with two buttons:
+
+```
+Section "InputDevice"
+  Identifier "VMouse0"
+  Driver "mouse"
+  Option "Protocol" "BusMouse"
+  Option "Device" "/dev/vmouse0"
+  Option "Buttons" "2"
+EndSection
+```
+
+Finally, under the `ServerLayout` section set the virtual mouse as a `CorePointer`. For example:
+
+```
+Section "ServerLayout"
+  Identifier "X.org Configured"
+  Screen 0 "Screen0" 0 0
+  InputDevice "VMouse0" "CorePointer"
+  InputDevice "Keyboard0" "CoreKeyboard"
+EndSection
+```
+
 ## Development environment
 
 A few notes about the development environment:
