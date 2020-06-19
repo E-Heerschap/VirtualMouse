@@ -1,6 +1,10 @@
-# SneakyMouse
+# VirtualMouse
 
 Virtual mouse drivers for linux.
+This system is most likely *overkill* for your purposes. See if [xdotool](https://github.com/jordansissel/xdotool) provides the functionality you need. xdotool provides a C library and also a [command line tool](http://manpages.ubuntu.com/manpages/trusty/man1/xdotool.1.html). Alternatively, there are many examples of input subsystem based drivers (planned for virtual mouse) for VirtualMouse which can be used.
+
+## Build
+VirtualMouse is designed for version 5.4.x for the Linux Kernel. This kernel module is built [how any other kernel module is built](https://tldp.org/LDP/lkmpg/2.6/html/x181.html). However, for contributors or developers using a Vagrant built virtual machine the simplest method is to adapt the [VirtualHideout Vagrant Build System](https://github.com/kingpulse/VirtualHideoutVagrant) to their needs and compile using the `build.sh` script.
 
 ## X11 configuration
 The X window system can be configured to use specific devices. In some cases this is necesary if the X window system does not
